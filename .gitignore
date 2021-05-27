@@ -1,0 +1,8 @@
+install/ecs-cli.asc
+*.swp
+to/compose/app
+to/kubernetes/app
+install/sessionmanager-bundle
+install/*.rpm
+install/*/deb
+*.bak

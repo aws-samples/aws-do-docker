@@ -1,0 +1,56 @@
+ARG BASE_IMAGE_PATH="python:3.9"
+
+######################################################################
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. #
+# SPDX-License-Identifier: MIT-0                                     #
+######################################################################
+
+# Multi-stage build: compile
+FROM $BASE_IMAGE_PATH as build-image
+
+# Install aws-lambda-cpp build dependencies
+RUN apt-get update && \
+  apt-get install -y \
+  g++ \
+  make \
+  cmake \
+  unzip \
+  libcurl4-openssl-dev
+
+# Install aws-mapbda-rie Runtime Interface Emulator for testing
+RUN curl -Lo /tmp/aws-lambda-rie \
+https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest/download/aws-lambda-rie \
+&& chmod +x /tmp/aws-lambda-rie && mv /tmp/aws-lambda-rie /usr/local/bin
+
+# Create function directory
+RUN mkdir -p /function
+
+# Copy function code
+COPY Container-Root/function/* /function/
+
+# Install the runtime interface client
+RUN pip install --target /function awslambdaric
+
+# Multi-stage build: runtime container
+FROM $BASE_IMAGE_PATH as runtime-image
+ARG BUILD="202105"
+ARG MAINTAINER="Full Name <email@company.com>"
+ARG DESCRIPTION="Depend on Docker Image"
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+
+LABEL MAINTAINER="$MAINTAINER"
+
+LABEL DESCRIPTION="$DESCRIPTION"
+
+LABEL BUILD="$BUILD"
+
+COPY --from=build-image /function /function
+RUN mv /function/test*.sh /
+COPY --from=build-image /usr/local/bin/aws-lambda-rie /usr/local/bin/aws-lambda-rie
+
+WORKDIR /function
+ENTRYPOINT [ "/function/startup.sh" ]
+CMD [ "lambda_function.handler" ]
+
